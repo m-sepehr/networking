@@ -4,15 +4,6 @@ import socket
 
 bufferSize = 1024
 
-# TCPServerSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# TCPServerSocket.connect((localIP, localPort))
-# print("TCP server up and listening")
-
-# # send message fom client to server
-# message = "hello"
-# bytesToSend = str.encode(message)
-# TCPServerSocket.send(bytesToSend)
-
 def main():
     first_start = True
     cli_text = "myftp> Press 1 for TCP, Press 2 for UDP: "
@@ -34,7 +25,7 @@ def main():
                 TCPServerSocket.connect((localIP, localPort))
                 print("myftp> Session has been established using TCP.")
                 conn_type = "TCP"
-                pass
+                
             else:
                 # UDP selected
                 # Create a datagram socket
@@ -43,7 +34,7 @@ def main():
                 UDPServerSocket.connect((localIP, localPort))
                 print("myftp> Session has been established using UDP.")
                 conn_type = "UDP"
-                pass
+                
         elif command.startswith("get"):
             # Extract filename and call get_file
             pass
@@ -62,7 +53,21 @@ def main():
                         UDPServerSocket.send(data)
                 # Send end-of-transmission signal
                 UDPServerSocket.send(b'END')
-                pass
+                
+
+            elif conn_type == "TCP":
+                # Send file over TCP
+                TCPServerSocket.send(filename.encode())
+
+                with open(filename, 'rb') as f:
+                    while True:
+                        data = f.read(bufferSize)
+                        if not data:
+                            break
+                        TCPServerSocket.send(data)
+                TCPServerSocket.send(b'END')
+                
+
         elif command.startswith("change"):
             # Extract filenames and call change_file
             pass
