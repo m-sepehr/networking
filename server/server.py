@@ -2,7 +2,27 @@ import os
 import socket
 import sys
 import threading
+import struct
 
+def unpack_request(request):
+    opcode_and_length = request[0]
+    opcode = opcode_and_length >> 5
+    filename_length = opcode_and_length & 0b00011111
+    filename = request[1:filename_length+1].decode()
+
+    if opcode == 0: #000 for PUT
+        file_size = struct.unpack('I', request[filename_length+1:filename_length+5])[0]
+        return opcode, filename, file_size
+    if opcode == 1: #001 for GET
+        return opcode, filename, None
+    
+
+def unpack_request_get(request):
+    opcode_and_length = request[0]
+    opcode = opcode_and_length >> 5
+    filename_length = opcode_and_length & 0b00011111
+    filename = request[1:filename_length+1].decode()
+    return opcode, filename
 
 def udp_connection(localIP, localPort, bufferSize):
     UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -12,18 +32,26 @@ def udp_connection(localIP, localPort, bufferSize):
     while True:
             # Receiving filename from the client
             udp_request = UDPClientSocket.recvfrom(bufferSize)
-            filename = udp_request[0].decode()
-            print("Filename received:", filename)
+            print(udp_request)
+            opcode, filename, file_size = unpack_request(udp_request[0]) 
 
-            # Create file and save data
-            with open(filename, 'wb') as f:
-                print("File opened")
-                while True:
-                    data, _ = UDPClientSocket.recvfrom(bufferSize)
-                    if data == b'END':
-                        print("File transmission completed")
-                        break
-                    f.write(data)
+            if opcode == 0: #000 for PUT
+                with open(filename, 'wb') as f:
+                    while True:
+                        data, addr = UDPClientSocket.recvfrom(bufferSize)
+                        if data == b'END':
+                            print("File transmission completed")
+                            break
+                        f.write(data)
+
+            elif opcode == 1: #001 for GET
+                with open(filename, 'rb') as f:
+                    while True:
+                        data = f.read(bufferSize)
+                        if not data:
+                            break
+                        UDPClientSocket.sendto(data, udp_request[1])
+                UDPClientSocket.sendto(b'END', udp_request[1])
         
 
 
