@@ -35,15 +35,19 @@ def tcp_connection(localIP, localPort, bufferSize):
     while (True):
         TCPClientSocket.listen()
         conn, addr = TCPClientSocket.accept()
-
-        with conn:
-            while True:
-                data = conn.recv(16)
-                if not data:
-                    break
-                print(data.decode())
+        filename = conn.recv(bufferSize).decode()
+        print("Filename received:", filename)
         
-    
+        with conn:
+            with open(filename, 'wb') as f:
+                while True:
+                    data = conn.recv(bufferSize)
+                    if data == b'END':
+                        print("File transmission completed")
+                        break
+                    f.write(data)
+        conn.close()
+
         
 if __name__ == "__main__":
 
