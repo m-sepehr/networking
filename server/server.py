@@ -26,6 +26,13 @@ def unpack_request_summary(request, filename_length):
     filename = request[1:filename_length+1].decode()
     return filename
 
+def create_request_summary(opcode, filename):
+
+    opcode_and_length = (opcode << 5) + len(filename)
+    filename = filename.encode('utf-8')
+    file_size = os.path.getsize(filename)
+    request = struct.pack('B', opcode_and_length) + filename + struct.pack('I', file_size)
+    return request
 
 #------------------------------------------------------------
 # UDP
@@ -101,7 +108,7 @@ def udp_connection(localIP, localPort, bufferSize):
                         response = 5 # 101 for unsuccessful name change
                 else:
                     response = 3 # 011 for file does not exist
-                    
+
                 # convert to bytes
                 response = response << 5
                 response = response.to_bytes(1, 'big')
@@ -126,15 +133,28 @@ def udp_connection(localIP, localPort, bufferSize):
                         print("Maximum:", maximum)
                         print("Average:", average)
 
-                    # convert to bytes
-                    minimum_bytes = minimum.to_bytes(4, 'big')
-                    maximum_bytes = maximum.to_bytes(4, 'big')
-                    average_bytes = str(average).encode()
+                    response_filename = "summary.txt"
+                    # writing to new file
 
-                    # send minimum, maximum, and average to client
-                    UDPClientSocket.sendto(minimum_bytes, udp_request[1])
-                    UDPClientSocket.sendto(maximum_bytes, udp_request[1])
-                    UDPClientSocket.sendto(average_bytes, udp_request[1])
+                    with open(response_filename, 'w') as f:
+                        f.write("Minimum: " + str(minimum) + "\n")
+                        f.write("Maximum: " + str(maximum) + "\n")
+                        f.write("Average: " + str(average) + "\n")
+                    
+                    response = create_request_summary(2, response_filename)
+                    if debug: print(response)
+                    UDPClientSocket.sendto(response, udp_request[1])
+                    # sending summary file to client
+                    with open(response_filename, 'rb') as f:
+                        while True:
+                            data = f.read(bufferSize)
+                            if not data:
+                                break
+                            UDPClientSocket.sendto(data, udp_request[1])
+                    UDPClientSocket.sendto(b'END', udp_request[1])   
+
+                    # deleting summary file
+                    os.remove(response_filename)                 
 
         
 #------------------------------------------------------------
