@@ -22,7 +22,10 @@ def unpack_request_change(request, filename_length):
     filename = request[1:filename_length+1].decode()
     new_filename = request[filename_length+1:].decode()
     return filename, new_filename
-    
+
+def unpack_request_summary(request, filename_length):
+    filename = request[1:filename_length+1].decode()
+    return filename
 
 
 #------------------------------------------------------------
@@ -70,14 +73,44 @@ def udp_connection(localIP, localPort, bufferSize):
             #------------------------------------------------------------
             # CHANGE FILENAME
             #------------------------------------------------------------
-            elif opcode == 3: #011 for CHANGE
+            elif opcode == 2: #011 for CHANGE
                 filename, new_filename = unpack_request_change(udp_request[0], filename_length)
                 os.rename(filename, new_filename)
                 if debug: print("Filename changed from", filename, "to", new_filename)
+
+            #------------------------------------------------------------
+            # SUMMARY
+            #------------------------------------------------------------
+            elif opcode == 3: #011 for SUMMARY
+                filename = unpack_request_summary(udp_request[0], filename_length)
+                with open (filename, 'rt') as f:
+                    data = f.read()
+                    data = data.split()
+                    data = [int(i) for i in data] # convert strings to integers
+
+                    minimum = min(data)
+                    maximum = max(data)
+                    average = sum(data) / len(data)
+
+                    if debug:
+                        print("Minimum:", minimum)
+                        print("Maximum:", maximum)
+                        print("Average:", average)
+
+                    # convert to bytes
+                    minimum_bytes = minimum.to_bytes(4, 'big')
+                    maximum_bytes = maximum.to_bytes(4, 'big')
+                    average_bytes = str(average).encode()
+
+                    # send minimum, maximum, and average to client
+                    UDPClientSocket.sendto(minimum_bytes, udp_request[1])
+                    UDPClientSocket.sendto(maximum_bytes, udp_request[1])
+                    UDPClientSocket.sendto(average_bytes, udp_request[1])
+
         
 #------------------------------------------------------------
-
-
+# TCP
+#------------------------------------------------------------
 def tcp_connection(localIP, localPort, bufferSize):
     TCPClientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     TCPClientSocket.bind((localIP, localPort))
