@@ -87,8 +87,25 @@ def udp_connection(localIP, localPort, bufferSize):
             #------------------------------------------------------------
             elif opcode == 2: #011 for CHANGE
                 filename, new_filename = unpack_request_change(udp_request[0], filename_length)
-                os.rename(filename, new_filename)
-                if debug: print("Filename changed from", filename, "to", new_filename)
+                
+                # checking to see if file exists
+                if os.path.isfile(filename):
+
+                    os.rename(filename, new_filename)
+                    if debug: print("Filename changed from", filename, "to", new_filename)
+
+                    # send response
+                    if os.path.isfile(new_filename) and not os.path.isfile(filename):
+                        response = 0 # 000 for successful transmission
+                    else:
+                        response = 5 # 101 for unsuccessful name change
+                else:
+                    response = 3 # 011 for file does not exist
+                    
+                # convert to bytes
+                response = response << 5
+                response = response.to_bytes(1, 'big')
+                UDPClientSocket.sendto(response, udp_request[1])
 
             #------------------------------------------------------------
             # SUMMARY
