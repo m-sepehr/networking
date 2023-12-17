@@ -79,20 +79,35 @@ def main():
 
             request = create_request(opcode, filename)
             print(request)
-
+            
             # ~~~~~~~~~~~~~~~~~~~~~
             # UDP
             # ~~~~~~~~~~~~~~~~~~~~~
             if conn_type == "UDP":
                 # receive file over UDP
                 UDPServerSocket.send(request)
-                with open(filename, 'wb') as f:
-                    while True:
-                        data, addr = UDPServerSocket.recvfrom(bufferSize)
-                        if data == b'END':
-                            print("File transmission completed")
-                            break
-                        f.write(data)
+
+                # receive response from server
+                response, _ = UDPServerSocket.recvfrom(bufferSize)
+                opcode_and_length = get_opcode_and_length(response)
+                opcode = opcode_and_length >> 5
+                filename_length = opcode_and_length & 0b00011111
+
+                if opcode == 1: # 001 for GET
+                    # receive file over UDP
+                    filename, file_size = unpack_request_summary(response, filename_length)
+                    print(filename, file_size)
+
+                    with open(filename, 'wb') as f:
+                        while True:
+                            data, addr = UDPServerSocket.recvfrom(bufferSize)
+                            if data == b'END':
+                                print("File download completed")
+                                break
+                            f.write(data)
+                
+                elif opcode == 3: # 011 for file not found
+                    print("Error: File does not exist")
             
             # ~~~~~~~~~~~~~~~~~~~~~
             # TCP
@@ -134,7 +149,7 @@ def main():
                 response_opcode = response >> 5
 
                 if response_opcode == 0:
-                    print("File transmission successful")
+                    print("File upload successful")
                 else:
                     print("Error: File transmission unsuccessful")
                 
@@ -175,24 +190,24 @@ def main():
                 opcode_and_length = get_opcode_and_length(response_summary)
                 opcode = opcode_and_length >> 5
                 filename_length = opcode_and_length & 0b00011111
-                filename, filesize = unpack_request_summary(response_summary, filename_length)
 
-                with open(filename, 'wb') as f:
-                    while True:
-                        data, addr = UDPServerSocket.recvfrom(bufferSize)
-                        if data == b'END':
-                            print("File transmission completed")
-                            break
-                        f.write(data)
+                if opcode == 2: # 010 for successful summary
+                    filename, filesize = unpack_request_summary(response_summary, filename_length)
+
+                    with open(filename, 'wb') as f:
+                        while True:
+                            data, addr = UDPServerSocket.recvfrom(bufferSize)
+                            if data == b'END':
+                                print("Summary downloaded successfully\n")
+                                break
+                            f.write(data)
+                    
+                    with open(filename, 'rt') as f:
+                        data = f.read()
+                        print(data)
                 
-                with open(filename, 'rt') as f:
-                    data = f.read()
-                    print(data)
-
-
-
-
-
+                elif opcode == 3: # 011 for file not found
+                    print("Error: File does not exist")
 
         #------------------------------------------------------------
         # CHANGE FILENAME
@@ -232,6 +247,6 @@ def main():
             print("myftp> Session is terminated.")
             break
         else:
-            print("myftp> Unknown command.")
+            print("Error: Unknown request.")
 
 main()
