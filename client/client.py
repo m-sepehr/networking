@@ -118,6 +118,17 @@ def main():
                         UDPServerSocket.send(data)
                 # Send end-of-transmission signal
                 UDPServerSocket.send(b'END')
+
+                # receive response from server
+                response, _ = UDPServerSocket.recvfrom(bufferSize)
+                response = int.from_bytes(response, 'big')
+                
+                response_opcode = response >> 5
+
+                if response_opcode == 0:
+                    print("File transmission successful")
+                else:
+                    print("Error: File transmission unsuccessful")
                 
             # ~~~~~~~~~~~~~~~~~~~~~
             # TCP
