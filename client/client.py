@@ -195,6 +195,19 @@ def main():
             if conn_type == "UDP":
                 # Send file over UDP
                 UDPServerSocket.send(request)
+            
+                # receive response from server
+                response, _ = UDPServerSocket.recvfrom(bufferSize)
+                response = int.from_bytes(response, 'big')
+
+                response_opcode = response >> 5
+                
+                if response_opcode == 0:
+                    print("Filename changed from", filename, "to", new_filename)
+                elif response_opcode == 5:
+                    print("Error: Filename change unsuccessful")
+                elif response_opcode == 3:
+                    print("Error: Filename change unsuccessful. File does not exist")
 
                     
         elif command == "help":
