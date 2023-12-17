@@ -26,6 +26,11 @@ def create_request_change_name(opcode, filename, new_filename):
     request = struct.pack('B', opcode_and_length) + filename + new_filename
     return request
 
+def create_request_help(opcode):
+    opcode_and_length = (opcode << 5)
+    request = struct.pack('B', opcode_and_length)
+    return request
+
 def get_opcode_and_length(response: bytes):
     opcode_and_length = response[0]
     return opcode_and_length
@@ -239,10 +244,39 @@ def main():
                 elif response_opcode == 3:
                     print("Error: Filename change unsuccessful. File does not exist")
 
-                    
+        #------------------------------------------------------------
+        # HELP
+        #------------------------------------------------------------       
         elif command == "help":
-            # he
-            pass
+            opcode = 4 # 100 for help
+            request = create_request_help(opcode)
+            print(request)
+
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # UDP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            
+            UDPServerSocket.send(request)
+
+            # receive response from server
+            response, _ = UDPServerSocket.recvfrom(bufferSize)
+            opcode_and_length = get_opcode_and_length(response)
+            opcode = opcode_and_length >> 5
+            data_length = opcode_and_length & 0b00011111
+
+            if opcode == 6:
+                data = response[1:data_length+1].decode()
+                print(data)
+            
+            else:
+                print("Error: Unknown request.")
+
+
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # TCP
+            # ~~~~~~~~~~~~~~~~~~~~~
+
+
         elif command == "bye":
             print("myftp> Session is terminated.")
             break
