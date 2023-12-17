@@ -14,7 +14,7 @@ def create_request(opcode, filename):
     if opcode == 0:
         file_size = os.path.getsize(filename)
         request = struct.pack('B', opcode_and_length) + filename + struct.pack('I', file_size)
-    elif opcode == 1:
+    elif opcode == 1 or opcode == 3:
         request = struct.pack('B', opcode_and_length) + filename
 
     return request
@@ -133,14 +133,37 @@ def main():
                             break
                         TCPServerSocket.send(data)
                 TCPServerSocket.send(b'END')
-         
+        
+        #------------------------------------------------------------
+        # SUMMARY
+        #------------------------------------------------------------
+        elif command.startswith("summary"):
+            filename = command.split()[1]
+            opcode = 3
+            request = create_request(opcode, filename)
+            print(request)
+
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # UDP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            if conn_type == "UDP":
+                # Send file over UDP
+                UDPServerSocket.send(request)
+                summary = UDPServerSocket.recv(bufferSize)
+                print(summary.decode())
+
+
+
+
+
+
         #------------------------------------------------------------
         # CHANGE FILENAME
         #------------------------------------------------------------   
         elif command.startswith("change"):
             filename = command.split()[1]
             new_filename = command.split()[2]
-            opcode = 3 # 011 for change
+            opcode = 2 # 010 for change
             request = create_request_change_name(opcode, filename, new_filename)
             print(request)
 
