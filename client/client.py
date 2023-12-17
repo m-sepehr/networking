@@ -26,6 +26,14 @@ def create_request_change_name(opcode, filename, new_filename):
     request = struct.pack('B', opcode_and_length) + filename + new_filename
     return request
 
+def get_opcode_and_length(response: bytes):
+    opcode_and_length = response[0]
+    return opcode_and_length
+
+def unpack_request_summary(response, filename_length):
+    filename = response[1:filename_length+1].decode()
+    file_size = struct.unpack('I', response[filename_length+1:filename_length+5])[0]
+    return filename, file_size
 
 def main():
     first_start = True
@@ -158,21 +166,28 @@ def main():
             # UDP
             # ~~~~~~~~~~~~~~~~~~~~~
             if conn_type == "UDP":
-                # Send file over UDP
+                # send request to server
                 UDPServerSocket.send(request)
-                # receive minimum, maximum, and average from server
-                minimum_bytes, _ = UDPServerSocket.recvfrom(bufferSize)
-                maximum_bytes, _ = UDPServerSocket.recvfrom(bufferSize)
-                average_bytes, _ = UDPServerSocket.recvfrom(bufferSize)
 
-                # convert bytes to integers
-                minimum = int.from_bytes(minimum_bytes, 'big')
-                maximum = int.from_bytes(maximum_bytes, 'big')
-                average = float(average_bytes.decode())
+                # receive file over UDP
+                response_summary = UDPServerSocket.recv(bufferSize)
+                print(response_summary)
+                opcode_and_length = get_opcode_and_length(response_summary)
+                opcode = opcode_and_length >> 5
+                filename_length = opcode_and_length & 0b00011111
+                filename, filesize = unpack_request_summary(response_summary, filename_length)
 
-                print("Minimum:", minimum)
-                print("Maximum:", maximum)
-                print("Average:", average)
+                with open(filename, 'wb') as f:
+                    while True:
+                        data, addr = UDPServerSocket.recvfrom(bufferSize)
+                        if data == b'END':
+                            print("File transmission completed")
+                            break
+                        f.write(data)
+                
+                with open(filename, 'rt') as f:
+                    data = f.read()
+                    print(data)
 
 
 
