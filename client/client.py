@@ -149,8 +149,19 @@ def main():
             if conn_type == "UDP":
                 # Send file over UDP
                 UDPServerSocket.send(request)
-                summary = UDPServerSocket.recv(bufferSize)
-                print(summary.decode())
+                # receive minimum, maximum, and average from server
+                minimum_bytes, _ = UDPServerSocket.recvfrom(bufferSize)
+                maximum_bytes, _ = UDPServerSocket.recvfrom(bufferSize)
+                average_bytes, _ = UDPServerSocket.recvfrom(bufferSize)
+
+                # convert bytes to integers
+                minimum = int.from_bytes(minimum_bytes, 'big')
+                maximum = int.from_bytes(maximum_bytes, 'big')
+                average = float(average_bytes.decode())
+
+                print("Minimum:", minimum)
+                print("Maximum:", maximum)
+                print("Average:", average)
 
 
 
