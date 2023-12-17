@@ -182,7 +182,20 @@ def udp_connection(localIP, localPort, bufferSize):
                     response = response << 5
                     response = response.to_bytes(1, 'big')
                     UDPClientSocket.sendto(response, udp_request[1])
-                    
+            #------------------------------------------------------------
+            # HELP
+            #------------------------------------------------------------
+            elif opcode == 4: #100 for HELP
+                response = 6 # 110 for help
+                response = response << 5
+                help_message = "PUT\nGET\nCHANGE\nSUMMARY\nHELP"
+                response += len(help_message)
+                response = response.to_bytes(1, 'big')
+            
+                response = response + help_message.encode('utf-8')
+
+                UDPClientSocket.sendto(response, udp_request[1])
+
             #------------------------------------------------------------
             # UNKNOWN REQUEST
             #------------------------------------------------------------
