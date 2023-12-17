@@ -11,7 +11,6 @@ def get_opcode_and_length(request):
 def unpack_request_put(request, filename_length):
     filename = request[1:filename_length+1].decode()
     file_size = struct.unpack('I', request[filename_length+1:filename_length+5])[0]
-
     return filename, file_size
 
 def unpack_request_get(request, filename_length):
@@ -56,6 +55,19 @@ def udp_connection(localIP, localPort, bufferSize):
                             if debug: print("File transmission completed")
                             break
                         f.write(data)
+
+                # checking if transmission successful and sending response
+                if os.path.getsize(filename) == file_size:
+                    response = 0 # 000 for successful transmission
+                else:
+                    response = 7 # 111 for unsuccessful transmission
+                    
+                # convert to bytes
+                response = response << 5
+                response = response.to_bytes(1, 'big')
+                UDPClientSocket.sendto(response, udp_request[1])
+
+
 
             #------------------------------------------------------------
             # GET
