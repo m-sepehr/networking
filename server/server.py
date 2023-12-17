@@ -26,7 +26,7 @@ def unpack_request_summary(request, filename_length):
     filename = request[1:filename_length+1].decode()
     return filename
 
-def create_request_summary(opcode, filename):
+def create_request(opcode, filename):
 
     opcode_and_length = (opcode << 5) + len(filename)
     filename = filename.encode('utf-8')
@@ -81,13 +81,31 @@ def udp_connection(localIP, localPort, bufferSize):
             #------------------------------------------------------------
             elif opcode == 1: #001 for GET
                 filename = unpack_request_get(udp_request[0], filename_length)
-                with open(filename, 'rb') as f:
-                    while True:
-                        data = f.read(bufferSize)
-                        if not data:
-                            break
-                        UDPClientSocket.sendto(data, udp_request[1])
-                UDPClientSocket.sendto(b'END', udp_request[1])
+                
+
+                # checking to see if file exists
+                if os.path.isfile(filename):
+                    response = create_request(1, filename)
+                    if debug: print(response)
+                    UDPClientSocket.sendto(response, udp_request[1])
+
+                    # sending file to client
+                    with open(filename, 'rb') as f:
+                        while True:
+                            data = f.read(bufferSize)
+                            if not data:
+                                break
+                            UDPClientSocket.sendto(data, udp_request[1])
+                    UDPClientSocket.sendto(b'END', udp_request[1])
+
+                else:
+                    response = 3 # 011 for file does not exist
+                    response = response << 5
+                    response = response.to_bytes(1, 'big')
+                    UDPClientSocket.sendto(response, udp_request[1])
+                
+                
+                
 
             #------------------------------------------------------------
             # CHANGE FILENAME
@@ -119,44 +137,62 @@ def udp_connection(localIP, localPort, bufferSize):
             #------------------------------------------------------------
             elif opcode == 3: #011 for SUMMARY
                 filename = unpack_request_summary(udp_request[0], filename_length)
-                with open (filename, 'rt') as f:
-                    data = f.read()
-                    data = data.split()
-                    data = [int(i) for i in data] # convert strings to integers
 
-                    minimum = min(data)
-                    maximum = max(data)
-                    average = sum(data) / len(data)
+                # checking to see if file exists
+                if os.path.isfile(filename):
+                    with open (filename, 'rt') as f:
+                        data = f.read()
+                        data = data.split()
+                        data = [int(i) for i in data] # convert strings to integers
 
-                    if debug:
-                        print("Minimum:", minimum)
-                        print("Maximum:", maximum)
-                        print("Average:", average)
+                        minimum = min(data)
+                        maximum = max(data)
+                        average = sum(data) / len(data)
 
-                    response_filename = "summary.txt"
-                    # writing to new file
+                        if debug:
+                            print("Minimum:", minimum)
+                            print("Maximum:", maximum)
+                            print("Average:", average)
 
-                    with open(response_filename, 'w') as f:
-                        f.write("Minimum: " + str(minimum) + "\n")
-                        f.write("Maximum: " + str(maximum) + "\n")
-                        f.write("Average: " + str(average) + "\n")
-                    
-                    response = create_request_summary(2, response_filename)
-                    if debug: print(response)
+                        response_filename = "summary.txt"
+                        # writing to new file
+
+                        with open(response_filename, 'w') as f:
+                            f.write("Minimum: " + str(minimum) + "\n")
+                            f.write("Maximum: " + str(maximum) + "\n")
+                            f.write("Average: " + str(average) + "\n")
+                        
+                        response = create_request(2, response_filename)
+                        if debug: print(response)
+                        UDPClientSocket.sendto(response, udp_request[1])
+                        # sending summary file to client
+                        with open(response_filename, 'rb') as f:
+                            while True:
+                                data = f.read(bufferSize)
+                                if not data:
+                                    break
+                                UDPClientSocket.sendto(data, udp_request[1])
+                        UDPClientSocket.sendto(b'END', udp_request[1])   
+
+                        # deleting summary file
+                        os.remove(response_filename)                 
+
+                else:
+                    response = 3 # 011 for file does not exist
+                    response = response << 5
+                    response = response.to_bytes(1, 'big')
                     UDPClientSocket.sendto(response, udp_request[1])
-                    # sending summary file to client
-                    with open(response_filename, 'rb') as f:
-                        while True:
-                            data = f.read(bufferSize)
-                            if not data:
-                                break
-                            UDPClientSocket.sendto(data, udp_request[1])
-                    UDPClientSocket.sendto(b'END', udp_request[1])   
+                    
+            #------------------------------------------------------------
+            # UNKNOWN REQUEST
+            #------------------------------------------------------------
+            else:
+                if debug: print("Error: Unknown request")
+                response = 4 # 100 for unknown request
+                response = response << 5
+                response = response.to_bytes(1, 'big')
+                UDPClientSocket.sendto(response, udp_request[1])
 
-                    # deleting summary file
-                    os.remove(response_filename)                 
-
-        
 #------------------------------------------------------------
 # TCP
 #------------------------------------------------------------
