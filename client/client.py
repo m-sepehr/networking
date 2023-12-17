@@ -133,15 +133,25 @@ def main():
                             break
                         TCPServerSocket.send(data)
                 TCPServerSocket.send(b'END')
-                
+         
         #------------------------------------------------------------
         # CHANGE FILENAME
         #------------------------------------------------------------   
         elif command.startswith("change"):
             filename = command.split()[1]
             new_filename = command.split()[2]
-            opcode = 2 # 010 for change
+            opcode = 3 # 011 for change
             request = create_request_change_name(opcode, filename, new_filename)
+            print(request)
+
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # UDP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            if conn_type == "UDP":
+                # Send file over UDP
+                UDPServerSocket.send(request)
+
+                    
         elif command == "help":
             # he
             pass
