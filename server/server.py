@@ -162,7 +162,7 @@ def udp_connection(localIP, localPort, bufferSize):
                             f.write("Maximum: " + str(maximum) + "\n")
                             f.write("Average: " + str(average) + "\n")
                         
-                        response = create_request(2, response_filename)
+                        response = create_request(2, response_filename) # 010 for SUMMARY
                         if debug: print(response)
                         UDPClientSocket.sendto(response, udp_request[1])
                         # sending summary file to client
@@ -214,21 +214,183 @@ def tcp_connection(localIP, localPort, bufferSize):
     TCPClientSocket.bind((localIP, localPort))
     if debug: print("TCP server up and listening")
     while (True):
-        TCPClientSocket.listen()
-        conn, addr = TCPClientSocket.accept()
-        filename = conn.recv(bufferSize).decode()
-        if debug: print("Filename received:", filename)
-        
-        with conn:
-            with open(filename, 'wb') as f:
-                while True:
-                    data = conn.recv(bufferSize)
-                    if data == b'END':
-                        if debug: print("File transmission completed")
-                        break
-                    f.write(data)
-        conn.close()
+        TCPClientSocket.listen(1)
+        connection, address = TCPClientSocket.accept()
+        if debug: print("Connection from", address)
+        while (True):
+            # Receiving filename from the client
+            tcp_request = connection.recv(bufferSize)
+            if debug: print(tcp_request)
+            opcode_ang_length = get_opcode_and_length(tcp_request) 
+            opcode = opcode_ang_length >> 5
+            filename_length = opcode_ang_length & 0b00011111
+            if debug: print("Opcode:", opcode)
 
+            #------------------------------------------------------------
+            # PUT
+            #------------------------------------------------------------        
+            if opcode == 0:
+                filename, file_size = unpack_request_put(tcp_request, filename_length)
+                with open(filename, 'wb') as f:
+                    while True:
+                        data = connection.recv(bufferSize)
+                        if b'END' in data:
+                            # Find the index of b'END' in data
+                            end_index = data.index(b'END')
+                            # Write everything before b'END' to the file
+                            f.write(data[:end_index])
+                            if debug: print("File transmission completed")
+                            break
+                        f.write(data)
+
+                # checking if transmission successful and sending response
+                if os.path.getsize(filename) == file_size:
+                    response = 0 # 000 for successful transmission
+                else:
+                    response = 7 # 111 for unsuccessful transmission
+                
+                # convert to bytes
+                response = response << 5
+                response = response.to_bytes(1, 'big')
+                connection.send(response)
+
+            #------------------------------------------------------------
+            # GET
+            #------------------------------------------------------------
+            elif opcode == 1:
+                filename = unpack_request_get(tcp_request, filename_length)
+
+                # checking to see if file exists
+                if os.path.isfile(filename):
+                    response = create_request(1, filename)
+                    if debug: print(response)
+                    connection.send(response)
+
+                    # sending file to client
+                    with open(filename, 'rb') as f:
+                        while True:
+                            data = f.read(bufferSize)
+                            if not data:
+                                break
+                            connection.send(data)
+                    connection.send(b'END')
+
+                else:
+                    response = 3 # 011 for file does not exist
+                    # convert to bytes
+                    response = response << 5
+                    response = response.to_bytes(1, 'big')
+                    connection.send(response)
+
+            #------------------------------------------------------------
+            # CHANGE FILENAME
+            #------------------------------------------------------------
+            elif opcode == 2:
+                filename, new_filename = unpack_request_change(tcp_request, filename_length)
+
+                # checking to see if file exists
+
+                if os.path.isfile(filename):
+                    os.rename(filename, new_filename)
+                    if debug: print("Filename changed from", filename, "to", new_filename)
+
+                    # send response
+                    if os.path.isfile(new_filename) and not os.path.isfile(filename):
+                        response = 0 # 000 for successful transmission
+                    else:
+                        response = 5 # 101 for unsuccessful name change
+
+                else:
+                    response = 3
+
+                # convert to bytes
+                response = response << 5
+                response = response.to_bytes(1, 'big')
+                connection.send(response)
+
+
+
+            #------------------------------------------------------------
+            # SUMMARY
+            #------------------------------------------------------------
+            
+            elif opcode == 3:
+                filename = unpack_request_summary(tcp_request, filename_length)
+
+                # checking to see if file exists
+                if os.path.isfile(filename):
+                    with open (filename, 'rt') as f:
+                        data = f.read()
+                        data = data.split()
+                        data = [int(i) for i in data]
+                
+                        minimum = min(data)
+                        maximum = max(data)
+                        average = sum(data) / len(data)
+
+                        if debug:
+                            print("Minimum:", minimum)
+                            print("Maximum:", maximum)
+                            print("Average:", average)
+
+                        response_filename = "summary.txt"
+
+                        # writing to new file
+                        with open(response_filename, 'w') as f:
+                            f.write("Minimum: " + str(minimum) + "\n")
+                            f.write("Maximum: " + str(maximum) + "\n")
+                            f.write("Average: " + str(average) + "\n")
+
+                        response = create_request(2, response_filename)
+                        if debug: print(response)
+
+                        connection.send(response)
+                        # sending summary file to client
+                        with open(response_filename, 'rb') as f:
+                            while True:
+                                data = f.read(bufferSize)
+                                if not data:
+                                    break
+                                connection.send(data)
+                        connection.send(b'END')
+
+                        # deleting summary file
+                        os.remove(response_filename)
+
+                else:
+                    response = 3
+                    response = response << 5
+                    response = response.to_bytes(1, 'big')
+                    connection.send(response)
+
+            #------------------------------------------------------------
+            # HELP
+            #------------------------------------------------------------
+            elif opcode == 4:
+                response = 6 # 110 for help
+                response = response << 5
+                help_message = "PUT\nGET\nCHANGE\nSUMMARY\nHELP"
+                response += len(help_message)
+                response = response.to_bytes(1, 'big')
+            
+                response = response + help_message.encode('utf-8')
+
+                connection.send(response)
+
+            #------------------------------------------------------------
+            # CLOSE CONNECTION
+            #------------------------------------------------------------
+            elif opcode == 5:
+                if debug: print("Closing TCP connection with " + str(address))
+                response = 7 # 111 for closing connection
+                response = response << 5
+                response = response.to_bytes(1, 'big')
+                connection.send(response)
+                
+                connection.close()
+                break
+
+                
         
 if __name__ == "__main__":
 
