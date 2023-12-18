@@ -117,7 +117,37 @@ def main():
             # ~~~~~~~~~~~~~~~~~~~~~
             # TCP
             # ~~~~~~~~~~~~~~~~~~~~~
-            
+            if conn_type == "TCP":
+
+                # Send file over TCP
+                TCPServerSocket.send(request)
+
+                # receive response from server
+                response = TCPServerSocket.recv(bufferSize)
+                opcode_and_length = get_opcode_and_length(response)
+                opcode = opcode_and_length >> 5
+                filename_length = opcode_and_length & 0b00011111
+
+                if opcode == 1: # 001 for GET
+                    # receive file over TCP
+                    filename, file_size = unpack_request_summary(response, filename_length)
+                    print(filename, file_size)
+
+                    with open(filename, 'wb') as f:
+                        while True:
+                            data = TCPServerSocket.recv(bufferSize)
+                            if b'END' in data:
+                                # Find the index of b'END' in data
+                                end_index = data.index(b'END')
+                                # Write everything before b'END' to the file
+                                f.write(data[:end_index])
+                                print("File download completed")
+                                break
+                            f.write(data)
+                
+                elif opcode == 3: # 011 for file not found
+                    print("Error: File does not exist")
+
 
 
         #------------------------------------------------------------
@@ -127,52 +157,73 @@ def main():
             filename = command.split()[1]
             opcode = 0 # 000 for put
             
+            # check if file exists
+            if os.path.isfile(filename):
+                request = create_request(opcode, filename)
+                print(request)
 
-            request = create_request(opcode, filename)
-            print(request)
+                # ~~~~~~~~~~~~~~~~~~~~~
+                # UDP
+                # ~~~~~~~~~~~~~~~~~~~~~
+                if conn_type == "UDP":
+                    
+                    # Send file over UDP
+                    UDPServerSocket.send(request)
+                    with open(filename, 'rb') as f:
+                        while True:
+                            data = f.read(bufferSize)
+                            if not data:
+                                break
+                            UDPServerSocket.send(data)
+                    # Send end-of-transmission signal
+                    UDPServerSocket.send(b'END')
 
-            # ~~~~~~~~~~~~~~~~~~~~~
-            # UDP
-            # ~~~~~~~~~~~~~~~~~~~~~
-            if conn_type == "UDP":
-                # Send file over UDP
-                UDPServerSocket.send(request)
+                    # receive response from server
+                    response, _ = UDPServerSocket.recvfrom(bufferSize)
+                    response = int.from_bytes(response, 'big')
+                    
+                    response_opcode = response >> 5
 
-                with open(filename, 'rb') as f:
-                    while True:
-                        data = f.read(bufferSize)
-                        if not data:
-                            break
-                        UDPServerSocket.send(data)
-                # Send end-of-transmission signal
-                UDPServerSocket.send(b'END')
-
-                # receive response from server
-                response, _ = UDPServerSocket.recvfrom(bufferSize)
-                response = int.from_bytes(response, 'big')
+                    if response_opcode == 0:
+                        print("File upload successful")
+                    else:
+                        print("Error: File transmission unsuccessful")
                 
-                response_opcode = response >> 5
+               
 
-                if response_opcode == 0:
-                    print("File upload successful")
-                else:
-                    print("Error: File transmission unsuccessful")
-                
-            # ~~~~~~~~~~~~~~~~~~~~~
-            # TCP
-            # ~~~~~~~~~~~~~~~~~~~~~
-            elif conn_type == "TCP":
-                # Send file over TCP
-                TCPServerSocket.send(filename.encode())
+                    
+                # ~~~~~~~~~~~~~~~~~~~~~
+                # TCP
+                # ~~~~~~~~~~~~~~~~~~~~~
+                elif conn_type == "TCP":
 
-                with open(filename, 'rb') as f:
-                    while True:
-                        data = f.read(bufferSize)
-                        if not data:
-                            break
-                        TCPServerSocket.send(data)
-                TCPServerSocket.send(b'END')
-        
+                    #send file over TCP
+                    TCPServerSocket.send(request)
+
+                    with open(filename, 'rb') as f:
+                        while True:
+                            data = f.read(bufferSize)
+                            if not data:
+                                break
+                            TCPServerSocket.send(data)
+                        # Send end-of-transmission signal
+                        TCPServerSocket.send(b'END')
+
+                    #receive response from server
+                    response = TCPServerSocket.recv(bufferSize)
+                    response = int.from_bytes(response, 'big')
+
+                    response_opcode = response >> 5
+
+                    if response_opcode == 0:
+                        print("File upload successful")
+                    else:
+                        print("Error: File upload unsuccessful")
+                    
+            else:
+                print("Error: File does not exist")
+
+
         #------------------------------------------------------------
         # SUMMARY
         #------------------------------------------------------------
@@ -214,6 +265,43 @@ def main():
                 elif opcode == 3: # 011 for file not found
                     print("Error: File does not exist")
 
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # TCP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            elif conn_type == "TCP":
+                # send request to server
+                TCPServerSocket.send(request)
+
+                # receive file over TCP
+                response_summary = TCPServerSocket.recv(bufferSize)
+                print(response_summary)
+                opcode_and_length = get_opcode_and_length(response_summary)
+                opcode = opcode_and_length >> 5
+                filename_length = opcode_and_length & 0b00011111
+
+                if opcode == 2:
+                    filename, filesize = unpack_request_summary(response_summary, filename_length)
+
+                    with open(filename, 'wb') as f:
+                        while True:
+                            data = TCPServerSocket.recv(bufferSize)
+                            if b'END' in data:
+                                # Find the index of b'END' in data
+                                end_index = data.index(b'END')
+                                # Write everything before b'END' to the file
+                                f.write(data[:end_index])
+                                print("Summary downloaded successfully\n")
+                                break
+                            f.write(data)
+                    
+                    with open(filename, 'rt') as f:
+                        data = f.read()
+                        print(data)
+
+                elif opcode == 3: # 011 for file not found
+                    print("Error: File does not exist")
+
+
         #------------------------------------------------------------
         # CHANGE FILENAME
         #------------------------------------------------------------   
@@ -244,6 +332,28 @@ def main():
                 elif response_opcode == 3:
                     print("Error: Filename change unsuccessful. File does not exist")
 
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # TCP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            elif conn_type == "TCP":
+                # Send file over TCP
+                TCPServerSocket.send(request)
+
+                # receive response from server
+                response = TCPServerSocket.recv(bufferSize)
+                response = int.from_bytes(response, 'big')
+
+                response_opcode = response >> 5
+                
+                if response_opcode == 0:
+                    print("Filename changed from", filename, "to", new_filename)
+                elif response_opcode == 5:
+                    print("Error: Filename change unsuccessful")
+                elif response_opcode == 3:
+                    print("Error: Filename change unsuccessful. File does not exist")
+
+
+
         #------------------------------------------------------------
         # HELP
         #------------------------------------------------------------       
@@ -256,30 +366,74 @@ def main():
             # UDP
             # ~~~~~~~~~~~~~~~~~~~~~
             
-            UDPServerSocket.send(request)
+            if conn_type == "UDP":
+                UDPServerSocket.send(request)
 
-            # receive response from server
-            response, _ = UDPServerSocket.recvfrom(bufferSize)
-            opcode_and_length = get_opcode_and_length(response)
-            opcode = opcode_and_length >> 5
-            data_length = opcode_and_length & 0b00011111
+                # receive response from server
+                response, _ = UDPServerSocket.recvfrom(bufferSize)
+                opcode_and_length = get_opcode_and_length(response)
+                opcode = opcode_and_length >> 5
+                data_length = opcode_and_length & 0b00011111
 
-            if opcode == 6:
-                data = response[1:data_length+1].decode()
-                print(data)
-            
-            else:
-                print("Error: Unknown request.")
+                if opcode == 6:
+                    data = response[1:data_length+1].decode()
+                    print(data)
+                
+                else:
+                    print("Error: Unknown request.")
 
 
             # ~~~~~~~~~~~~~~~~~~~~~
             # TCP
             # ~~~~~~~~~~~~~~~~~~~~~
+            elif conn_type == "TCP":
+                TCPServerSocket.send(request)
+
+                # receive response from server
+                response = TCPServerSocket.recv(bufferSize)
+                opcode_and_length = get_opcode_and_length(response)
+                opcode = opcode_and_length >> 5
+                data_length = opcode_and_length & 0b00011111
+
+                if opcode == 6:
+                    data = response[1:data_length+1].decode()
+                    print(data)
+
+                else:
+                    print("Error: Unknown request.")
 
 
         elif command == "bye":
-            print("myftp> Session is terminated.")
-            break
+
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # UDP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            if conn_type == "UDP":
+                UDPServerSocket.close()
+                print("myftp> Session closing...")
+                break
+            # ~~~~~~~~~~~~~~~~~~~~~
+            # TCP
+            # ~~~~~~~~~~~~~~~~~~~~~
+            elif conn_type == "TCP":
+                # send termination request to server
+                opcode = 5 # 101 for bye
+                request = create_request_help(opcode)
+                TCPServerSocket.send(request)
+
+                # receive response from server
+                response = TCPServerSocket.recv(bufferSize)
+                opcode_and_length = get_opcode_and_length(response)
+                opcode = opcode_and_length >> 5
+                data_length = opcode_and_length & 0b00011111
+
+                if opcode == 7:
+                    print ("TCP session terminated successfully")
+                    TCPServerSocket.close()
+                    print("myftp> Session closing...")
+                    break
+                else:
+                    print ("Error: TCP session termination unsuccessful")
         else:
             print("Error: Unknown request.")
 
