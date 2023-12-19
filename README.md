@@ -119,7 +119,11 @@ To exit the client program, simply use the `bye` command to close the session or
 - Files to be uploaded using the `put` command must be present in the client's current directory.
 - Files downloaded using the `get` command will be saved to the client's current directory.
 - The `change` command will only work if the specified file exists on the server.
-- The `summary` command expects the file to contain numerical data for summarization.
+- The `summary` command expects the file to contain numerical data in the form of a text file
+  with values on separate lines for summarization. It will return the Min, Avg and Max values 
+  of values in the file.
+
+  
 
 ## Troubleshooting
 
