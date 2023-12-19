@@ -83,7 +83,7 @@ def main():
             opcode = 1 # 001 for get
 
             request = create_request(opcode, filename)
-            print(request)
+            if debug: print(request)
             
             # ~~~~~~~~~~~~~~~~~~~~~
             # UDP
@@ -101,7 +101,7 @@ def main():
                 if opcode == 1: # 001 for GET
                     # receive file over UDP
                     filename, file_size = unpack_request_summary(response, filename_length)
-                    print(filename, file_size)
+                    if debug: print(filename, file_size)
 
                     with open(filename, 'wb') as f:
                         while True:
@@ -131,7 +131,7 @@ def main():
                 if opcode == 1: # 001 for GET
                     # receive file over TCP
                     filename, file_size = unpack_request_summary(response, filename_length)
-                    print(filename, file_size)
+                    if debug: print(filename, file_size)
 
                     with open(filename, 'wb') as f:
                         while True:
@@ -160,7 +160,7 @@ def main():
             # check if file exists
             if os.path.isfile(filename):
                 request = create_request(opcode, filename)
-                print(request)
+                if debug: print(request)
 
                 # ~~~~~~~~~~~~~~~~~~~~~
                 # UDP
@@ -231,7 +231,7 @@ def main():
             filename = command.split()[1]
             opcode = 3
             request = create_request(opcode, filename)
-            print(request)
+            if debug: print(request)
 
             # ~~~~~~~~~~~~~~~~~~~~~
             # UDP
@@ -242,7 +242,7 @@ def main():
 
                 # receive file over UDP
                 response_summary = UDPServerSocket.recv(bufferSize)
-                print(response_summary)
+                if debug: print(response_summary)
                 opcode_and_length = get_opcode_and_length(response_summary)
                 opcode = opcode_and_length >> 5
                 filename_length = opcode_and_length & 0b00011111
@@ -274,7 +274,7 @@ def main():
 
                 # receive file over TCP
                 response_summary = TCPServerSocket.recv(bufferSize)
-                print(response_summary)
+                if debug: print(response_summary)
                 opcode_and_length = get_opcode_and_length(response_summary)
                 opcode = opcode_and_length >> 5
                 filename_length = opcode_and_length & 0b00011111
@@ -310,7 +310,7 @@ def main():
             new_filename = command.split()[2]
             opcode = 2 # 010 for change
             request = create_request_change_name(opcode, filename, new_filename)
-            print(request)
+            if debug: print(request)
 
             # ~~~~~~~~~~~~~~~~~~~~~
             # UDP
@@ -360,7 +360,7 @@ def main():
         elif command == "help":
             opcode = 4 # 100 for help
             request = create_request_help(opcode)
-            print(request)
+            if debug: print(request)
 
             # ~~~~~~~~~~~~~~~~~~~~~
             # UDP
@@ -437,4 +437,19 @@ def main():
         else:
             print("Error: Unknown request.")
 
-main()
+if __name__ == "__main__":
+
+    debug = False
+
+    if len(sys.argv) == 2:
+        if sys.argv[1] == "-d":
+            debug = True
+        else:
+            print("Usage: python3 client.py [-d]")
+    
+    main()
+    
+
+    
+
+
