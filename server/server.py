@@ -40,7 +40,7 @@ def create_request(opcode, filename):
 def udp_connection(localIP, localPort, bufferSize):
     UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     UDPClientSocket.bind((localIP, localPort))
-    if debug: print("UDP server up and listening")
+    print("UDP server up and listening")
 
     while True:
             # Receiving filename from the client
@@ -212,7 +212,7 @@ def udp_connection(localIP, localPort, bufferSize):
 def tcp_connection(localIP, localPort, bufferSize):
     TCPClientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     TCPClientSocket.bind((localIP, localPort))
-    if debug: print("TCP server up and listening")
+    print("TCP server up and listening")
     while (True):
         TCPClientSocket.listen(1)
         connection, address = TCPClientSocket.accept()
