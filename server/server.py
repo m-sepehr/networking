@@ -386,7 +386,7 @@ def tcp_connection(localIP, localPort, bufferSize):
                 response = response << 5
                 response = response.to_bytes(1, 'big')
                 connection.send(response)
-                
+
                 connection.close()
                 break
 
@@ -394,13 +394,20 @@ def tcp_connection(localIP, localPort, bufferSize):
         
 if __name__ == "__main__":
 
-    if (len(sys.argv) != 3):
-        print("Usage: python server.py <port> <debug>")
+    debug = False
+
+    if (len(sys.argv) == 3):
+        if sys.argv[2] == "-d":
+            debug = True
+        else:
+            print("Usage: python server.py <port> [-d]")
+            sys.exit(1)
+    elif (len(sys.argv) != 2):
+        print("Usage: python server.py <port> [-d]")
         sys.exit(1)
 
     localIP = "127.0.0.1"
     localPort = int(sys.argv[1])
-    debug = bool(int(sys.argv[2]))
     bufferSize = 1024
 
     tcp_thread = threading.Thread(target=tcp_connection, args=(localIP, localPort, bufferSize)).start()
