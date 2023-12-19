@@ -1,6 +1,6 @@
 # Networking Client and Server Programs
 
-Welcome to the Networking Client and Server Programs documentation. These programs facilitate file operations such as file transfers, renaming, and summarizing over TCP and UDP protocols.
+These programs facilitate file operations such as file transfers, renaming, and summarizing over TCP and UDP protocols.
 
 ## Table of Contents
 
