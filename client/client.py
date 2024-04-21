@@ -3,14 +3,27 @@ import sys
 import socket
 import struct
 
+#===============================================================================
+# This is a simple FTP client that can connect to a server using TCP or UDP.
+# The client can perform the following operations:
+# 1. GET: Download a file from the server
+# 2. PUT: Upload a file to the server
+# 3. SUMMARY: Download a summary of the file from the server
+# 4. CHANGE: Change the filename of a file on the server
+# 5. HELP: Display a list of available commands
+# 6. BYE: Terminate the session
+#===============================================================================
+
 bufferSize = 1024
 
+#===============================================================================
+# Utility functions
+#===============================================================================
 def create_request(opcode, filename):
 
     opcode_and_length = (opcode << 5) + len(filename)
     filename = filename.encode('utf-8')
     
-
     if opcode == 0:
         file_size = os.path.getsize(filename)
         request = struct.pack('B', opcode_and_length) + filename + struct.pack('I', file_size)
@@ -40,6 +53,9 @@ def unpack_request_summary(response, filename_length):
     file_size = struct.unpack('I', response[filename_length+1:filename_length+5])[0]
     return filename, file_size
 
+#===============================================================================
+# Main function
+#===============================================================================
 def main():
     first_start = True
     cli_text = "myftp> Press 1 for TCP, Press 2 for UDP: "
@@ -437,6 +453,9 @@ def main():
         else:
             print("Error: Unknown request.")
 
+#===============================================================================
+# Entry point
+#===============================================================================
 if __name__ == "__main__":
 
     debug = False
