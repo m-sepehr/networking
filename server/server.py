@@ -4,6 +4,22 @@ import sys
 import threading
 import struct
 
+#===============================================================================
+# This server program is designed to receive requests from clients and perform 
+# the following operations:
+# PUT: Receives a file from the client and saves it in the server
+# GET: Sends a file to the client
+# CHANGE: Changes the name of a file in the server
+# SUMMARY: Sends a summary file to the client containing the minimum, maximum and average of the numbers in the file
+# HELP: Sends a help message to the client
+# The server can handle both TCP and UDP connections and can run concurrently
+#===============================================================================
+
+
+#===============================================================================
+# Utility functions
+#===============================================================================
+
 def get_opcode_and_length(request):
     opcode_and_length = request[0]
     return opcode_and_length
@@ -27,16 +43,15 @@ def unpack_request_summary(request, filename_length):
     return filename
 
 def create_request(opcode, filename):
-
     opcode_and_length = (opcode << 5) + len(filename)
     filename = filename.encode('utf-8')
     file_size = os.path.getsize(filename)
     request = struct.pack('B', opcode_and_length) + filename + struct.pack('I', file_size)
     return request
 
-#------------------------------------------------------------
+#===============================================================================
 # UDP
-#------------------------------------------------------------
+#===============================================================================
 def udp_connection(localIP, localPort, bufferSize):
     UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     UDPClientSocket.bind((localIP, localPort))
@@ -206,9 +221,10 @@ def udp_connection(localIP, localPort, bufferSize):
                 response = response.to_bytes(1, 'big')
                 UDPClientSocket.sendto(response, udp_request[1])
 
-#------------------------------------------------------------
+
+#===============================================================================
 # TCP
-#------------------------------------------------------------
+#===============================================================================
 def tcp_connection(localIP, localPort, bufferSize):
     TCPClientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     TCPClientSocket.bind((localIP, localPort))
@@ -250,6 +266,10 @@ def tcp_connection(localIP, localPort, bufferSize):
                     response = 7 # 111 for unsuccessful transmission
                 
                 # convert to bytes
+                if debug: print (filename)
+                if debug: print (os.path.getsize(filename))
+                if debug: print (file_size)
+                if debug: print(response)
                 response = response << 5
                 response = response.to_bytes(1, 'big')
                 connection.send(response)
@@ -390,8 +410,9 @@ def tcp_connection(localIP, localPort, bufferSize):
                 connection.close()
                 break
 
-                
-        
+#===============================================================================
+# Main
+#===============================================================================    
 if __name__ == "__main__":
 
     debug = False
@@ -410,6 +431,7 @@ if __name__ == "__main__":
     localPort = int(sys.argv[1])
     bufferSize = 1024
 
+    # creating threads for TCP and UDP connections so that they can run concurrently and clients can connect to either
     tcp_thread = threading.Thread(target=tcp_connection, args=(localIP, localPort, bufferSize)).start()
     udp_thrread = threading.Thread(target=udp_connection, args=(localIP, localPort, bufferSize)).start()
 
